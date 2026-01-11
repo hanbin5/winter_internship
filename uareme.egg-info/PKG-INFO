@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: uareme
+Version: 0.1.0
+Summary: UAREME package
+License-File: LICENSE.md
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: matplotlib
+Requires-Dist: geffnet
+Requires-Dist: gtsam
+Requires-Dist: opencv-python
+Requires-Dist: pyyaml
+Requires-Dist: vidgear
+Requires-Dist: yt_dlp
+Dynamic: license-file
