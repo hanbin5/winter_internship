@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
+from scipy.spatial.transform import Rotation as R
 
 from uareme_cls import UAREME
 
@@ -12,24 +13,21 @@ class ICLNUIMDataset(Dataset):
         self.image_path = image_path
         self.gt_path = gt_path
         
-        self.gt_rotations = self._load_gt_sim(self.gt_path)
+        self.gt_rotations = self._load_gt_freiburg(self.gt_path)
         self.images = sorted([f for f in os.listdir(self.image_path) if f.endswith('.png')],
-                             key=lambda x: int(x.split('.')[0]))[1:]
+                             key=lambda x: int(x.split('.')[0]))
 
-    def _load_gt_sim(self, path):
-        with open(path, 'r') as f:
-            lines = [line.strip() for line in f if line.strip()]
-
+    def _load_gt_freiburg(self, path):
+        data = np.loadtxt(path)
         matrices = []
-        for i in range(0, len(lines), 3):
-            rows = [list(map(float, lines[i+j].split())) for j in range(3)]
-            mat_3x4 = np.array(rows)
-            matrices.append(mat_3x4[:, :3])
-        
+        for row in data:
+            quat = row[4:8]
+            rot_matrix = R.from_quat(quat).as_matrix()
+            matrices.append(rot_matrix)
         return matrices
     
     def __len__(self):
-        return len(self.images)
+        return min(len(self.images), len(self.gt_rotations))
     
     def __getitem__(self, idx):
         img_path = os.path.join(self.image_path, self.images[idx])
@@ -54,6 +52,42 @@ def compute_are(R_gt, R_pred):
 
     return np.degrees(angle_rad)
 
+def evaluate_with_symmetry(R_gts, R_preds):
+    def get_24_symmetries():
+        # Right-handed 24-fold rotation matrices
+        perms = [[0,1,2], [0,2,1], [1,0,2], [1,2,0], [2,0,1], [2,1,0]]
+        signs = [[1,1,1], [1,1,-1], [1,-1,1], [1,-1,-1], [-1,1,1], [-1,1,-1], [-1,-1,1], [-1,-1,-1]]
+        soms = []
+        for p in perms:
+            for s in signs:
+                m = np.zeros((3, 3))
+                for i in range(3):
+                    m[i, p[i]] = s[i]
+                if np.isclose(np.linalg.det(m), 1.0):
+                    soms.append(m)
+        return soms
+
+    symmetries = get_24_symmetries()
+    best_avg_are = float('inf')
+    
+    for R_sym in symmetries:
+        # 핵심: R_preds에 오른쪽에 대칭 행렬을 곱함
+        curr_preds = [np.matmul(Rp, R_sym) for Rp in R_preds]
+        
+        # 0번 프레임 정렬
+        R_align = np.matmul(R_gts[0].T, curr_preds[0])
+        
+        ares = []
+        for Rg, Rp in zip(R_gts, curr_preds):
+            Rp_aligned = np.matmul(R_align, Rp)
+            ares.append(compute_are(Rg, Rp_aligned))
+        
+        avg_are = np.mean(ares)
+        if avg_are < best_avg_are:
+            best_avg_are = avg_are
+            
+    return best_avg_are
+
 def evaluate(R_gts, R_preds):
     R_gt0 = R_gts[0]
     R_pred0 = R_preds[0]
@@ -63,7 +97,7 @@ def evaluate(R_gts, R_preds):
     for R_g, R_p in zip(R_gts, R_preds):
         R_p_aligned = np.matmul(R_align, R_p)
 
-        are = compute_are(R_g, R_p_aligned)
+        are = compute_are(R_g, R_p)
         
         ares.append(are)
     
@@ -73,8 +107,8 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
     dataset = ICLNUIMDataset(
-        "/home/hanbin5/data/ICL-NUIM/living_room_traj0_frei_png/rgb",
-        "/home/hanbin5/data/ICL-NUIM/livingRoom0n.gt.sim.txt"
+        "/home/hanbin5/data/UZH-FPV/race_1/output",
+        "/home/hanbin5/data/UZH-FPV/race_1/groundtruth.txt"
     )
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
@@ -92,7 +126,7 @@ def main():
         preds.append(R_pred)
         gts.append(gt_rot.squeeze(0).numpy())
     
-    all_ares = evaluate(gts, preds)    
+    all_ares = evaluate_with_symmetry(gts, preds)    
 
     print("Final Results")
     print(f"Average ARE: {np.mean(all_ares):.4f} degrees")
