@@ -7,3 +7,5 @@ checkpoints/
 *.pyc
 *.mp4
 trajectory.txt
+.claude
+.gitignore

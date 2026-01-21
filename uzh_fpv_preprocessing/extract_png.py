@@ -65,7 +65,7 @@ def deserialize_pose_or_odom(rawdata, msgtype):
     offset += frame_id_len
     
     # Odometry일 경우 child_frame_id도 건너뛰기
-    if 'Odometry' in msgtype:
+    if 'odom' in msgtype:
         child_frame_len = struct.unpack_from('<I', rawdata, offset)[0]
         offset += 4
         offset += child_frame_len
