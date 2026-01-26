@@ -1,0 +1,12 @@
+--exp_name baseline
+--exp_id dsine_v00
+
+--model_architecture dsine_v00
+
+# UAREME args
+--b_kappa True
+--kappa_threshold 75.0
+--b_multiframe True
+--b_robust True
+--window_length 30
+--interframe_sigma 0.75

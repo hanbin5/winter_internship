@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from scipy.spatial.transform import Rotation as R
 
-from uareme_cls import UAREME
+from models.uareme import UAREME
 
 class ICLNUIMDataset(Dataset):
     def __init__(self, image_path, gt_path):
@@ -107,8 +107,8 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
     dataset = ICLNUIMDataset(
-        "/home/hanbin5/data/UZH-FPV/race_1/output",
-        "/home/hanbin5/data/UZH-FPV/race_1/groundtruth.txt"
+        "/home/hanbin5/data/UZH-FPV/indoor_forward_3/rgb",
+        "/home/hanbin5/data/UZH-FPV/indoor_forward_3/groundtruth.txt"
     )
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
@@ -121,7 +121,7 @@ def main():
     gts = []
     for image, gt_rot in dataloader:
         img_np = image.squeeze(0).numpy()
-        R_pred, _, _ = uareme.run(img_np)
+        R_pred, _, _ = uareme(img_np)
 
         preds.append(R_pred)
         gts.append(gt_rot.squeeze(0).numpy())

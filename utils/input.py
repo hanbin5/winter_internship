@@ -19,6 +19,112 @@ from PIL import Image
 # Helper functions #
 ####################################################################################
 
+def preprocess_img(img, format, device, normalize_fn):
+    """Preprocess image to torch tensor format.
+
+    Args:
+        img: numpy array (H, W, 3), uint8
+        format: 'RGB', 'BGR', or 'Grayscale'
+        device: torch device
+        normalize_fn: torchvision.transforms.Normalize instance
+
+    Returns:
+        img_torch: tensor (1, 3, H, W), normalized
+    """
+    H, W, D = img.shape
+    if format == 'BGR':
+        assert D == 3
+        img_rgb = img[:, :, ::-1]
+    elif format == 'Grayscale':
+        assert D == 1
+        img_rgb = np.dstack((img, img, img))
+    elif format == 'RGB':
+        assert D == 3
+        img_rgb = img
+    else:
+        raise ValueError(f'Unknown image format: {format}')
+
+    img_torch = torch.from_numpy(img_rgb.copy()).to(device).permute(2, 0, 1).to(dtype=torch.float32)
+    img_torch = (img_torch / 255.0).unsqueeze(0).contiguous()
+    img_torch = normalize_fn(img_torch)
+
+    return img_torch
+
+
+def extract_frames_from_video(video_path, target_size=None):
+    """Extract all frames from a video file.
+
+    Args:
+        video_path: path to video file (.mp4, .avi, etc.)
+        target_size: optional (W, H) tuple for resizing
+
+    Returns:
+        list of numpy arrays (H, W, 3) in RGB format
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise FileNotFoundError(f"Cannot open video: {video_path}")
+
+    frames = []
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        if target_size is not None:
+            frame_rgb = cv2.resize(frame_rgb, target_size)
+        frames.append(frame_rgb)
+
+    cap.release()
+    return frames
+
+
+def load_images_from_pattern(pattern, target_size=None):
+    """Load images from a glob pattern.
+
+    Args:
+        pattern: glob pattern (e.g., '/path/to/images/*.png')
+        target_size: optional (W, H) tuple for resizing
+
+    Returns:
+        list of numpy arrays (H, W, 3) in RGB format
+    """
+    image_paths = sorted(glob.glob(pattern))
+    if not image_paths:
+        raise FileNotFoundError(f"No images found for pattern: {pattern}")
+
+    images = []
+    for path in image_paths:
+        img = cv2.imread(path)
+        if img is None:
+            continue
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        if target_size is not None:
+            img_rgb = cv2.resize(img_rgb, target_size)
+        images.append(img_rgb)
+
+    return images
+
+
+def prepare_images(test_path, target_size=None):
+    """Prepare images from video file or image pattern.
+
+    Args:
+        test_path: video file path or image glob pattern
+        target_size: optional (W, H) tuple for resizing
+
+    Returns:
+        list of numpy arrays (H, W, 3) in RGB format
+    """
+    video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.webm']
+    ext = os.path.splitext(test_path)[1].lower()
+
+    if ext in video_extensions:
+        return extract_frames_from_video(test_path, target_size)
+    else:
+        return load_images_from_pattern(test_path, target_size)
+
+
 def load_checkpoint(fpath, model):
     ''' Loads checkpoint for the given model '''
 

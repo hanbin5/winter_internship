@@ -14,3 +14,8 @@ I reproduce U-ARE-ME algorithm inferencing ICL-NUIM.
 |Living 1|3.58|4.09|0.1424|
 |Living 2|2.39|2.62|0.0962|
 |Living 3|5.38|5.56|0.0335|
+
+|Sequences|My reproduction|
+|--|--|
+|race_1|82.64|
+|indoor_forward_3|110.87|
