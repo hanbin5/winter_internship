@@ -27,16 +27,16 @@ def get_args(test=False):
     #↑↑↑↑
 
     # read arguments from txt file
-    assert '.txt' in sys.argv[1], "첫 번째 인자로 .txt config 파일을 전달해주세요"
+    assert '.txt' in sys.argv[1]
     arg_filename_with_prefix = '@' + sys.argv[1]
     args = parser.parse_args([arg_filename_with_prefix] + sys.argv[2:])
 
     #↓↓↓↓
-    # NOTE: 프로젝트 고정값 설정
+    # NOTE: update args
     args.exp_root = os.path.join(EXPERIMENT_DIR, 'uareme')
     #↑↑↑↑
 
-    # output 디렉토리 생성
+    # set working dir
     exp_dir = os.path.join(args.exp_root, args.exp_name)
     os.makedirs(exp_dir, exist_ok=True)
 
@@ -50,7 +50,7 @@ def get_args(test=False):
     if not test and \
         not args.overwrite_models and \
             len(glob.glob(os.path.join(args.output_dir, 'models', '*.pt'))) > 0:
-        print('checkpoints exist! --overwrite_models 플래그를 사용하세요')
+        print('checkpoints exist!')
         exit()
 
     # 학습 시 로거/텐서보드 설정
