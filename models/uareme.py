@@ -66,7 +66,7 @@ class UAREME(nn.Module):
             )
 
         # Model settings
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("mps" if torch.cuda.is_available() else "cpu")
         checkpoints_dir = os.path.dirname(args.ckpt_path) if args.ckpt_path else None
         use_trt = getattr(args, 'use_trt', False)
         self.model = define_model(self.device, trt=use_trt, checkpoints_dir=checkpoints_dir)
@@ -84,7 +84,7 @@ class UAREME(nn.Module):
         self.prev_frame_time = time.time()
 
 
-    def forward(self, img : np.ndarray, format: str = 'RGB'):
+    def forward(self, img : np.ndarray, **kwargs):
         # Preprocess image to torch format. The input image must be uint8 format
         img_torch = preprocess_img(img, format, self.device, self.normalise_fn)
 

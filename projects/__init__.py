@@ -1,10 +1,9 @@
 import os
 import argparse
 
-DATASET_DIR = '/home/hanbin5/data/'   # where datasets are stored
-EXPERIMENT_DIR = '/home/hanbin5/experiments/'  # where to save the experiments
+DATASET_DIR = '/Users/hanbin5/Documents/data'   # where datasets are stored
+EXPERIMENT_DIR = '/Users/hanbin5/Documents/experiment'  # where to save the experiments
 PROJECT_DIR = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
-
 
 def get_default_parser():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@', conflict_handler='resolve')

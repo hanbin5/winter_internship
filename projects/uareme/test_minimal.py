@@ -24,7 +24,7 @@ if __name__ == '__main__':
     model = utils.load_checkpoint(args.ckpt_path, model)
     model.eval()
 
-    file_name = 'Boston-Drone.mp4'
+    file_name = '(소울2.사골국) 2.Letter.mp4'
     test_path = os.path.join('./samples/videos', file_name)
     color_images = prepare_images(test_path)
     print(f"Loaded {len(color_images)} images from {test_path}")
@@ -39,7 +39,7 @@ if __name__ == '__main__':
             R_traj.append(R_opt)
 
     # Save video with rotation axes overlay
-    output_dir = os.path.join('./sample/output')
+    output_dir = os.path.join('./samples/outputs')
     os.makedirs(output_dir, exist_ok=True)
 
     h, w = color_images[0].shape[:2]

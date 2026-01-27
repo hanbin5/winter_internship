@@ -4,110 +4,95 @@ Uncertainty-Aware Rotation Estimation in Manhattan Environments
 
 This script trains the DSINE (Dense Surface Normal Estimation) backbone
 which predicts per-pixel surface normals and uncertainty (kappa) from RGB images.
-
-Author's Note: The key insight is that surface normals predicted by neural networks
-are unreliable near object boundaries and on small objects. We learn to predict
-this uncertainty (kappa) so that unreliable predictions can be down-weighted
-during rotation optimization.
 """
 import os
-import sys
-import argparse
+import numpy as np
+from tqdm import tqdm
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
+
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
-import numpy as np
-from PIL import Image
-from tqdm import tqdm
 
+from PIL import Image
+
+import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+import projects.uareme.config as config
+from projects.baseline.dataloader import *
 from models.dsine.v00 import DSINE_v00
 
+def train(model, args, device=None):
+    if device is None:
+        device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    
+    train_loader = TrainLoader(args, epoch=0).data
+    val_loader = ValLoader(args).data
 
-class SurfaceNormalDataset(Dataset):
-    """
-    Dataset for surface normal estimation training.
+    loss_fn = ComputeLoss(args)
 
-    Expected data structure:
-    - data_root/
-        - rgb/          # RGB images
-        - normal/       # Ground truth surface normal maps (in camera coordinates)
-        - mask/         # Valid pixel masks (optional)
+    params = model.parameters()
 
-    Surface normals are stored as (H, W, 3) images where each pixel
-    contains a unit vector [nx, ny, nz] pointing outward from the surface.
-    """
-    def __init__(self, data_root, split='train', img_size=(480, 640)):
-        self.data_root = data_root
-        self.split = split
-        self.img_size = img_size  # (H, W)
+    optimizer = optim.AdamW(params, weight_decay=args.weight_decay, lr=args.lr)
 
-        # Load file lists
-        rgb_dir = os.path.join(data_root, split, 'rgb')
-        self.samples = []
+    scheduler = optim.lr_scheduler.OneCycleLR(
+        optimizer=optimizer,
+        max_lr=args.lr,
+        epochs=args.num_epochs,
+        steps_per_epoch=len(train_loader) // args.accumulate_grad_batches,
+        div_factor=25.0,
+        final_div_factor=10000.0
+    )
 
-        if os.path.exists(rgb_dir):
-            for fname in sorted(os.listdir(rgb_dir)):
-                if fname.endswith(('.png', '.jpg', '.jpeg')):
-                    rgb_path = os.path.join(rgb_dir, fname)
-                    normal_path = os.path.join(data_root, split, 'normal', fname.replace('.jpg', '.png').replace('.jpeg', '.png'))
-                    mask_path = os.path.join(data_root, split, 'mask', fname.replace('.jpg', '.png').replace('.jpeg', '.png'))
+    torch.backends.cudnn.enabled = True
+    torch.backends.cudnn.benchmark = True
+    scaler = torch.cuda.amp.GradScaler()
 
-                    if os.path.exists(normal_path):
-                        self.samples.append({
-                            'rgb': rgb_path,
-                            'normal': normal_path,
-                            'mask': mask_path if os.path.exists(mask_path) else None
-                        })
+    best_acc = 1e4
 
-        # ImageNet normalization (used by EfficientNet backbone)
-        self.normalize = transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225]
-        )
+    total_iter = 0
+    model.train()
+    for epoch in range(args.num_epochs):
+        train_loader = TrainLoader(args, epoch=epoch).data
 
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, idx):
-        sample = self.samples[idx]
-
-        # Load RGB image
-        rgb = Image.open(sample['rgb']).convert('RGB')
-        rgb = rgb.resize((self.img_size[1], self.img_size[0]), Image.BILINEAR)
-        rgb = torch.from_numpy(np.array(rgb)).permute(2, 0, 1).float() / 255.0
-        rgb = self.normalize(rgb)
-
-        # Load ground truth surface normals
-        normal = Image.open(sample['normal'])
-        normal = normal.resize((self.img_size[1], self.img_size[0]), Image.NEAREST)
-        normal = torch.from_numpy(np.array(normal)).float()
-
-        # Convert from [0, 255] to [-1, 1] range
-        if normal.max() > 1:
-            normal = normal / 127.5 - 1.0
-
-        # Ensure unit vectors
-        if len(normal.shape) == 3:
-            normal = normal.permute(2, 0, 1)  # (3, H, W)
-        normal = F.normalize(normal, p=2, dim=0)
-
-        # Load mask if available
-        if sample['mask'] is not None:
-            mask = Image.open(sample['mask']).convert('L')
-            mask = mask.resize((self.img_size[1], self.img_size[0]), Image.NEAREST)
-            mask = torch.from_numpy(np.array(mask)).float() / 255.0
+        if args.rank == 0:
+            data_loader = tqdm(train_loader, desc=f"Epoch: {epoch + 1}/{args.num_epochs}. Loop: Train")
         else:
-            mask = torch.ones(self.img_size[0], self.img_size[1])
+            data_loader = train_loader
+        
+        for batch_idx, data_dict in enumerate(data_loader):
+            total_iter += args.batch_size_orig
 
-        return {
-            'rgb': rgb,           # (3, H, W)
-            'normal': normal,     # (3, H, W)
-            'mask': mask          # (H, W)
-        }
+            # Forward pass
+            img = data_dict['img'].to(device)
+            gt_norm = data_dict['normal'].to(device)
+            gt_norm_mask = data_dict['normal_mask'].to(device)
+            intrins = data_dict['intrins'].to(device)
 
+            pred_list = model(img, intrins=intrins, model='train')
+            lost = loss_fn(pred_list, gt_norm, gt_norm_mask)
+            
+            # Back propagation
+            loss = loss / args.accumulate_grad_batches
+            scaler.scale(loss).backward()
+            
+            if ((batch_idx + 1) % args.accumulate_grad_batches == 0):
+                scaler.unscale_(optimizer)
+                nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
+                scheduler.step()
+
+            # Visualization
+
+
+            # Validation
+            
 
 class AngularLoss(nn.Module):
     """
