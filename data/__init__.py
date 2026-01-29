@@ -1,14 +1,13 @@
 """ data sample
 """
 class Sample():
-    def __init__(self, img=None,
+    def __init__(self, img=None, 
                  depth=None, depth_mask=None,
-                 normal=None, normal_mask=None,
-                 pose=None,
+                 normal=None, normal_mask=None, 
                  intrins=None, flipped=False,
-                 dataset_name='dataset', scene_name='scene', img_name='img',
+                 dataset_name='dataset', scene_name='scene', img_name='img', 
                  info={}):
-
+ 
         self.img = img                  # input image
 
         self.depth = depth              # depth - GT
@@ -16,9 +15,7 @@ class Sample():
 
         self.normal = normal            # surface normals - GT
         self.normal_mask = normal_mask  # surface normals - valid_mask
-
-        self.pose = pose                # camera pose (tx, ty, tz, qx, qy, qz, qw)
-
+        
         self.intrins = intrins          # camera intrinsics
         self.flipped = flipped          # True when the image is flipped during augmentation
 

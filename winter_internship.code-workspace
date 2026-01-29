@@ -1,13 +1,16 @@
 {
 	"folders": [
 		{
+			"name": "winter_internship",
 			"path": "."
 		},
 		{
-			"path": "../data"
+			"name": "data",
+			"path": "../../../data"
 		},
 		{
-			"path": "../DSINE"
+			"name": "experiments",
+			"path": "../experiments"
 		}
 	],
 	"settings": {}

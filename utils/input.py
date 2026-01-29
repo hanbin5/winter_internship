@@ -148,7 +148,7 @@ def define_model(device, trt=False, checkpoints_dir=None):
         model = TRTModule()
         model.load_state_dict(torch.load(file_path+'dsine_v00_trt.pth'))
     else:
-        from models.dsine.v00 import DSINE_v00 as DSINE
+        from models.v00 import DSINE_v00 as DSINE
         model = DSINE().to(device)
         checkpoint = os.path.join(file_path, 'dsine_v00.pt')
         model = load_checkpoint(checkpoint, model)

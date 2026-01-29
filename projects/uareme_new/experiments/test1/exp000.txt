@@ -1,0 +1,37 @@
+--exp_name test1
+--exp_id exp000
+
+--NNET_architecture v00
+--NNET_encoder_B 5
+--NNET_decoder_NF 2048
+--NNET_decoder_down 2
+--NNET_output_dim 4
+
+--NRN_prop_ps 5
+--NRN_num_iter_train 5
+--NRN_num_iter_test 5
+--NRN_ray_relu
+
+--data_augmentation_intrins
+--input_height 0
+--input_width 0
+--data_augmentation_hflip
+--data_augmentation_appear 2
+
+--diff_lr
+--loss_fn MW
+
+--num_epochs 5
+--batch_size 6
+--workers 32
+--accumulate_grad_batches 4
+
+--gpus 0
+
+--dataset_name_train vkitti
+--dataset_name_val vkitti
+--train_split vkitti
+--val_split vkitti
+
+--validate_every 1000
+--visualize_every 1000

@@ -9,3 +9,4 @@ checkpoints/
 trajectory.txt
 .claude
 .gitignore
+*.code-workspace

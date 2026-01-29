@@ -24,7 +24,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import projects.uareme.config as config
 from projects.baseline.dataloader import *
-from models.dsine.v00 import DSINE_v00
+from models.v00 import DSINE_v00
 
 def train(model, args, device=None):
     if device is None:
